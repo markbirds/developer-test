@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Task Manager</title>
+</head>
+<body>
+  <h1>Task Manager</h1>
+
+  <section>
+    <h2>Add a Task</h2>
+    <input id="titleInput" type="text" placeholder="Task title" />
+    <button id="addBtn">Add Task</button>
+    <p id="addError" style="color:red;display:none;"></p>
+  </section>
+
+  <section>
+    <h2>Tasks</h2>
+    <ul id="taskList"></ul>
+  </section>
+
+  <script>
+    const API = 'http://localhost:3000';
+    const VALID_STATUSES = ['pending', 'in-progress', 'done'];
+
+    async function fetchTasks() {
+      const res = await fetch(`${API}/tasks`);
+      const data = await res.json();
+      renderTasks(data.tasks);
+    }
+
+    function renderTasks(tasks) {
+      const list = document.getElementById('taskList');
+      list.innerHTML = '';
+
+      if (tasks.length === 0) {
+        list.innerHTML = '<li>No tasks yet.</li>';
+        return;
+      }
+
+      tasks.forEach(task => {
+        const li = document.createElement('li');
+        li.textContent = `[${task.status}] ${task.title} `;
+
+        const select = document.createElement('select');
+        VALID_STATUSES.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s;
+          opt.textContent = s;
+          if (s === task.status) opt.selected = true;
+          select.appendChild(opt);
+        });
+        select.onchange = () => updateStatus(task.id, select.value);
+        li.appendChild(select);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.onclick = () => deleteTask(task.id);
+        li.appendChild(deleteBtn);
+
+        list.appendChild(li);
+      });
+    }
+
+    async function addTask() {
+      const input = document.getElementById('titleInput');
+      const errorEl = document.getElementById('addError');
+      const title = input.value.trim();
+
+      errorEl.style.display = 'none';
+
+      if (!title) {
+        errorEl.textContent = 'Title is required.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      const res = await fetch(`${API}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        errorEl.textContent = data.message || 'Failed to add task.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      input.value = '';
+      fetchTasks();
+    }
+
+    async function updateStatus(id, status) {
+      await fetch(`${API}/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      fetchTasks();
+    }
+
+    async function deleteTask(id) {
+      await fetch(`${API}/tasks/${id}`, { method: 'DELETE' });
+      fetchTasks();
+    }
+
+    document.getElementById('addBtn').addEventListener('click', addTask);
+
+    document.getElementById('titleInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addTask();
+    });
+
+    fetchTasks();
+  </script>
+</body>
+</html>
